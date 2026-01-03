@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
 #include <math.h>
+#include <Snooze.h>
 
 // CAN settings
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1; // BMW-E90 side
@@ -17,10 +18,16 @@ unsigned long lastLedTime = 0;
 const unsigned long X1A0_SEND_INTERVAL = 5; //ms
 unsigned long last1a0SendTime = 0;
 
-void setup() {
-  // Initialize CAN buses
-  Can1.begin(); // BMW-E90 side  
-  Can1.setBaudRate(500000); 
+SnoozeDigital digital; // Driver for digital pin wake
+SnoozeBlock config(digital); // Install driver
+
+unsigned long lastCan1Time = 0;
+const unsigned long SLEEP_TIMEOUT = 1200000; // 20 min; test with shorter like 60000 (1 min) initially
+
+const int CAN1_RX_PIN = 23; // Default for Teensy 4.1 CAN1 RX (adjust if different)
+
+void initCanFilters() {
+  // Can1 filters (BMW side)
   Can1.setMBFilter(MB0, 0x130); // E90 CAS
   Can1.setMBFilter(MB1, 0x2FC); // E90 Enclosure status
   Can1.setMBFilter(MB2, 0x480); // Network Management
@@ -45,8 +52,7 @@ void setup() {
   Can1.setMBFilter(MB21, 0x200); // Cruise control status
   Can1.setMBFilter(MB22, 0x1A0); // Vehicle speed for EPS
 
-  Can2.begin(); // VCU side
-  Can2.setBaudRate(500000);
+  // Can2 filters (VCU side)
   Can2.setMBFilter(MB0, 0x0AA); // ABS/DSC info
   Can2.setMBFilter(MB1, 0x0A8); // Brake pedal status
   Can2.setMBFilter(MB2, 0X0A9); // Counter
@@ -55,6 +61,15 @@ void setup() {
   Can2.setMBFilter(MB5, 0x332); // Instrument cluster init
   Can2.setMBFilter(MB6, 0x1D2); // Shift position
   Can2.setMBFilter(MB7, 0x592); // Error lights
+}
+
+void setup() {
+  // Initialize CAN buses
+  Can1.begin(); // BMW-E90 side  
+  Can1.setBaudRate(500000); 
+  Can2.begin(); // VCU side
+  Can2.setBaudRate(500000);
+  initCanFilters(); // Set all filters
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -63,10 +78,14 @@ void setup() {
   last1A0Msg.len = 8;
   memset(last1A0Msg.buf, 0, 8);
   last1A0Msg.buf[0] = 0x6F;
+
+  // Configure wake on CAN RX pin
+  digital.pinMode(CAN1_RX_PIN, INPUT_PULLUP, FALLING); // pin, mode, type
 }
 
 void loop() {
   if (Can1.read(rxMsg)) {
+    lastCan1Time = millis(); // Any message resets
     if (rxMsg.id == 0x1A0) {
       last1A0Msg = rxMsg;
     } else {
@@ -107,4 +126,22 @@ void loop() {
 
     Can2.write(txMsg);
   }
+
+  if (millis() - lastCan1Time > SLEEP_TIMEOUT) {
+    enterLowPower();
+  }
+}
+
+void enterLowPower() {
+  // Prep: Stop LED
+  digitalWrite(LED_BUILTIN, LOW); // Off
+
+  // Sleep: Wake on CAN1 RX
+  Snooze.deepSleep(config);
+
+  // Post-wake: Re-init CAN buses and filters
+  Can1.begin(); Can1.setBaudRate(500000); 
+  Can2.begin(); Can2.setBaudRate(500000);
+  initCanFilters(); // Re-set all filters
+  lastCan1Time = millis(); // Reset
 }
