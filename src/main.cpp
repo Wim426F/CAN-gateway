@@ -1,14 +1,21 @@
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
+#include <math.h>
 
 // CAN settings
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1; // BMW-E90 side
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can2; // VCU side
 CAN_message_t rxMsg, txMsg;
 
+// Stored latest 0x1A0 message from Can1
+CAN_message_t last1A0Msg;
+
 // Timing variables
-const unsigned long CAN_SEND_INTERVAL = 100;
-unsigned long lastCanSendTime = 0;
+const unsigned long LED_INTERVAL = 100;
+unsigned long lastLedTime = 0;
+
+const unsigned long X1A0_SEND_INTERVAL = 5; //ms
+unsigned long last1a0SendTime = 0;
 
 void setup() {
   // Initialize CAN buses
@@ -36,6 +43,7 @@ void setup() {
   Can1.setMBFilter(MB19, 0x2EA); // Climate control settings passenger
   Can1.setMBFilter(MB20, 0x242); // Climate front status
   Can1.setMBFilter(MB21, 0x200); // Cruise control status
+  Can1.setMBFilter(MB22, 0x1A0); // Vehicle speed for EPS
 
   Can2.begin(); // VCU side
   Can2.setBaudRate(500000);
@@ -49,19 +57,54 @@ void setup() {
   Can2.setMBFilter(MB7, 0x592); // Error lights
 
   pinMode(LED_BUILTIN, OUTPUT);
+
+  // Initialize last1A0Msg with static default values
+  last1A0Msg.id = 0x1A0;
+  last1A0Msg.len = 8;
+  memset(last1A0Msg.buf, 0, 8);
+  last1A0Msg.buf[0] = 0x6F;
 }
 
 void loop() {
   if (Can1.read(rxMsg)) {
-    Can2.write(rxMsg);
+    if (rxMsg.id == 0x1A0) {
+      last1A0Msg = rxMsg;
+    } else {
+      Can2.write(rxMsg);
+    }
   }
   
   if (Can2.read(rxMsg)) {
     Can1.write(rxMsg);
   }
 
-  if (millis() - lastCanSendTime >= CAN_SEND_INTERVAL) {
-    lastCanSendTime = millis();
+  if (millis() - lastLedTime >= LED_INTERVAL) {
+    lastLedTime = millis();
     digitalToggle(LED_BUILTIN);
+  }
+
+  if (millis() - last1a0SendTime >= X1A0_SEND_INTERVAL) {
+    last1a0SendTime = millis();
+    txMsg = last1A0Msg;
+
+    // Extract raw VehicleSpeed (12-bit, little-endian, unsigned)
+    uint16_t raw = ((uint16_t)(txMsg.buf[1] & 0x0F) << 8) | txMsg.buf[0];
+
+    // Calculate physical speed
+    float speed_kph = raw * 0.103f;
+
+    // Apply minimum limit
+    if (speed_kph < 10.0f) {
+      speed_kph = 10.0f;
+    }
+
+    // Calculate new raw value
+    uint16_t new_raw = (uint16_t)roundf(speed_kph / 0.103f);
+
+    // Pack back into buffer, modifying only the VehicleSpeed bits
+    txMsg.buf[0] = (uint8_t)(new_raw & 0xFF);
+    txMsg.buf[1] = (txMsg.buf[1] & 0xF0) | (uint8_t)((new_raw >> 8) & 0x0F);
+
+    Can2.write(txMsg);
   }
 }
