@@ -22,7 +22,7 @@ SnoozeDigital digital; // Driver for digital pin wake
 SnoozeBlock config(digital); // Install driver
 
 unsigned long lastCan1Time = 0;
-const unsigned long SLEEP_TIMEOUT = 1200000; // 20 min; test with shorter like 60000 (1 min) initially
+const unsigned long SLEEP_TIMEOUT = 1200000; // 20 min
 
 const int CAN1_RX_PIN = 23; // Default for Teensy 4.1 CAN1 RX (adjust if different)
 
@@ -61,6 +61,20 @@ void initCanFilters() {
   Can2.setMBFilter(MB5, 0x332); // Instrument cluster init
   Can2.setMBFilter(MB6, 0x1D2); // Shift position
   Can2.setMBFilter(MB7, 0x592); // Error lights
+}
+
+void enterLowPower() {
+  // Prep: Stop LED
+  digitalWrite(LED_BUILTIN, LOW); // Off
+
+  // Sleep: Wake on CAN1 RX
+  Snooze.hibernate(config);
+
+  // Post-wake: Re-init CAN buses and filters
+  Can1.begin(); Can1.setBaudRate(500000); 
+  Can2.begin(); Can2.setBaudRate(500000);
+  initCanFilters(); // Re-set all filters
+  lastCan1Time = millis(); // Reset
 }
 
 void setup() {
@@ -130,18 +144,4 @@ void loop() {
   if (millis() - lastCan1Time > SLEEP_TIMEOUT) {
     enterLowPower();
   }
-}
-
-void enterLowPower() {
-  // Prep: Stop LED
-  digitalWrite(LED_BUILTIN, LOW); // Off
-
-  // Sleep: Wake on CAN1 RX
-  Snooze.deepSleep(config);
-
-  // Post-wake: Re-init CAN buses and filters
-  Can1.begin(); Can1.setBaudRate(500000); 
-  Can2.begin(); Can2.setBaudRate(500000);
-  initCanFilters(); // Re-set all filters
-  lastCan1Time = millis(); // Reset
 }
