@@ -64,17 +64,8 @@ void initCanFilters() {
 }
 
 void enterLowPower() {
-  // Prep: Stop LED
-  digitalWrite(LED_BUILTIN, LOW); // Off
-
-  // Sleep: Wake on CAN1 RX
-  Snooze.hibernate(config);
-
-  // Post-wake: Re-init CAN buses and filters
-  Can1.begin(); Can1.setBaudRate(500000); 
-  Can2.begin(); Can2.setBaudRate(500000);
-  initCanFilters(); // Re-set all filters
-  lastCan1Time = millis(); // Reset
+  digitalWrite(LED_BUILTIN, LOW);
+  Snooze.hibernate(config); // Reset on wake.
 }
 
 void setup() {
