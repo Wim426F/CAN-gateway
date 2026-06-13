@@ -18,13 +18,13 @@ unsigned long lastLedTime = 0;
 const unsigned long X1A0_SEND_INTERVAL = 5; //ms
 unsigned long last1a0SendTime = 0;
 
-SnoozeDigital digital; // Driver for digital pin wake
-SnoozeBlock config(digital); // Install driver
+SnoozeDigital digital;
+SnoozeBlock config(digital);
 
 unsigned long lastCan1Time = 0;
-const unsigned long SLEEP_TIMEOUT = 1200000; // 20 min
+const unsigned long SLEEP_TIMEOUT = 60000; // 1 min
 
-const int CAN1_RX_PIN = 23; // Default for Teensy 4.1 CAN1 RX (adjust if different)
+const int CAN1_RX_PIN = 23;
 
 void initCanFilters() {
   // Can1 filters (BMW side)
@@ -65,6 +65,12 @@ void initCanFilters() {
 
 void enterLowPower() {
   digitalWrite(LED_BUILTIN, LOW);
+
+  // Release pin 23 from FlexCAN and hand it to Snooze as a wake source.
+  // Hibernate resets the chip on wake, so no teardown of CAN state is needed.
+  pinMode(CAN1_RX_PIN, INPUT_PULLUP);
+  digital.pinMode(CAN1_RX_PIN, INPUT_PULLUP, FALLING);
+
   Snooze.hibernate(config); // Reset on wake.
 }
 
@@ -83,9 +89,6 @@ void setup() {
   last1A0Msg.len = 8;
   memset(last1A0Msg.buf, 0, 8);
   last1A0Msg.buf[0] = 0x6F;
-
-  // Configure wake on CAN RX pin
-  digital.pinMode(CAN1_RX_PIN, INPUT_PULLUP, FALLING); // pin, mode, type
 }
 
 void loop() {
