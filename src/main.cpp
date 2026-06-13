@@ -51,16 +51,25 @@ void initCanFilters() {
   Can1.setMBFilter(MB20, 0x242); // Climate front status
   Can1.setMBFilter(MB21, 0x200); // Cruise control status
   Can1.setMBFilter(MB22, 0x1A0); // Vehicle speed for EPS
+  Can1.setMBFilter(MB23, 0x330); // Vehicle speed for EPS
+  Can1.setMBFilter(MB24, 0x310); // Ambient temp and relative time
 
   // Can2 filters (VCU side)
-  Can2.setMBFilter(MB0, 0x0AA); // ABS/DSC info
-  Can2.setMBFilter(MB1, 0x0A8); // Brake pedal status
-  Can2.setMBFilter(MB2, 0X0A9); // Counter
-  Can2.setMBFilter(MB3, 0X0BA); // Gear
-  Can2.setMBFilter(MB4, 0X1D0); // Dashboard Engine info
-  Can2.setMBFilter(MB5, 0x332); // Instrument cluster init
-  Can2.setMBFilter(MB6, 0x1D2); // Shift position
-  Can2.setMBFilter(MB7, 0x592); // Error lights
+  Can2.setMBFilter(MB0,  0x0AA); // ABS/DSC info
+  Can2.setMBFilter(MB1,  0x0A8); // Brake pedal status
+  Can2.setMBFilter(MB2,  0X0A9); // Counter
+  Can2.setMBFilter(MB3,  0X0BA); // Gear
+  Can2.setMBFilter(MB4,  0X1D0); // Dashboard Engine info
+  Can2.setMBFilter(MB5,  0x332); // Instrument cluster init
+  Can2.setMBFilter(MB6,  0x1D2); // Shift position
+  Can2.setMBFilter(MB7,  0x592); // Error lights
+  Can2.setMBFilter(MB8,  0x200); // Cruise control status
+  Can2.setMBFilter(MB13,  0x1B5); // Heat flow climate
+  Can2.setMBFilter(MB9,  0x1B6); // Heat flow engine
+  Can2.setMBFilter(MB10, 0x381); // Engine oil level
+  Can2.setMBFilter(MB11, 0x3B3); // Power management consumption
+  Can2.setMBFilter(MB12, 0x3B4); // Power battery voltage
+  Can2.setMBFilter(MB13, 0x3B0); // Power battery voltage
 }
 
 void enterLowPower() {
